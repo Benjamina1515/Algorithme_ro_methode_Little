@@ -22,6 +22,13 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Debug logs
+    console.log('GraphVisualization - Cities:', cities);
+    console.log('GraphVisualization - Cost Matrix:', costMatrix);
+    console.log('GraphVisualization - Matrix dimensions:', costMatrix.length, 'x', costMatrix[0]?.length);
+    console.log('GraphVisualization - Valid connections found:', hasValidConnections);
+    console.log('GraphVisualization - Sample costs:', costMatrix.slice(0, 3).map(row => row.slice(0, 3)));
+
     // Set canvas size
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * devicePixelRatio;
@@ -35,130 +42,148 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Generate city positions in a circle if not provided
+    // Generate city positions in a more organized layout
     const positions = cities.map((city, index) => {
-      if (city.x !== undefined && city.y !== undefined) {
-        return { x: city.x, y: city.y };
+      let x, y;
+      
+      if (cities.length === 6) {
+        // Special layout for 6 cities (like in the image)
+        const positions6 = [
+          { x: width * 0.2, y: height * 0.3 },  // A (top-left)
+          { x: width * 0.4, y: height * 0.2 },  // B (top-center)
+          { x: width * 0.6, y: height * 0.3 },  // C (top-right)
+          { x: width * 0.3, y: height * 0.7 },  // D (bottom-left)
+          { x: width * 0.5, y: height * 0.8 },  // E (bottom-center)
+          { x: width * 0.7, y: height * 0.7 }   // F (bottom-right)
+        ];
+        return positions6[index];
+      } else if (cities.length <= 4) {
+        // Square layout for 4 or fewer cities
+        const positions4 = [
+          { x: width * 0.25, y: height * 0.25 }, // Top-left
+          { x: width * 0.75, y: height * 0.25 }, // Top-right
+          { x: width * 0.25, y: height * 0.75 }, // Bottom-left
+          { x: width * 0.75, y: height * 0.75 }  // Bottom-right
+        ];
+        return positions4[index];
+      } else {
+        // Circular layout for other numbers
+        const angle = (2 * Math.PI * index) / cities.length - Math.PI / 2;
+        const radius = Math.min(width, height) / 2 - margin;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        
+        x = centerX + radius * Math.cos(angle);
+        y = centerY + radius * Math.sin(angle);
+        return { x, y };
       }
-      
-      const angle = (2 * Math.PI * index) / cities.length - Math.PI / 2;
-      const radius = Math.min(width, height) / 2 - margin;
-      const centerX = width / 2;
-      const centerY = height / 2;
-      
-      return {
-        x: centerX + radius * Math.cos(angle),
-        y: centerY + radius * Math.sin(angle)
-      };
     });
 
-    // Draw edges (all connections)
-    ctx.strokeStyle = '#E5E7EB';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([5, 5]);
+    // Draw directed edges (arrows) for all valid connections
+    ctx.strokeStyle = '#8B4513'; // Brown color like in the image
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 4]); // Dashed lines
 
     for (let i = 0; i < cities.length; i++) {
-      for (let j = i + 1; j < cities.length; j++) {
-        if (costMatrix[i] && costMatrix[i][j] > 0) {
+      for (let j = 0; j < cities.length; j++) {
+        if (i !== j && costMatrix[i] && costMatrix[i][j] > 0) {
+          const from = positions[i];
+          const to = positions[j];
+          
+          // Calculate arrow position (avoiding overlap with nodes)
+          const angle = Math.atan2(to.y - from.y, to.x - from.x);
+          const nodeRadius = 30;
+          const startX = from.x + nodeRadius * Math.cos(angle);
+          const startY = from.y + nodeRadius * Math.sin(angle);
+          const endX = to.x - nodeRadius * Math.cos(angle);
+          const endY = to.y - nodeRadius * Math.sin(angle);
+          
+          // Draw arrow line
           ctx.beginPath();
-          ctx.moveTo(positions[i].x, positions[i].y);
-          ctx.lineTo(positions[j].x, positions[j].y);
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(endX, endY);
           ctx.stroke();
 
-          // Draw cost labels
-          const midX = (positions[i].x + positions[j].x) / 2;
-          const midY = (positions[i].y + positions[j].y) / 2;
+          // Draw arrowhead
+          const arrowLength = 15;
+          const arrowAngle = Math.PI / 6;
           
-          ctx.fillStyle = '#6B7280';
-          ctx.font = '12px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          
-          // Background for text
-          const text = costMatrix[i][j].toString();
-          const textWidth = ctx.measureText(text).width;
-          ctx.fillStyle = 'white';
-          ctx.fillRect(midX - textWidth/2 - 3, midY - 8, textWidth + 6, 16);
-          
-          ctx.fillStyle = '#6B7280';
-          ctx.fillText(text, midX, midY);
+          ctx.setLineDash([]); // Solid lines for arrowhead
+          ctx.beginPath();
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(
+            endX - arrowLength * Math.cos(angle - arrowAngle),
+            endY - arrowLength * Math.sin(angle - arrowAngle)
+          );
+          ctx.moveTo(endX, endY);
+          ctx.lineTo(
+            endX - arrowLength * Math.cos(angle + arrowAngle),
+            endY - arrowLength * Math.sin(angle + arrowAngle)
+          );
+          ctx.stroke();
+          ctx.setLineDash([8, 4]); // Back to dashed for lines
+
+          // Draw cost label on the edge
+          const cost = costMatrix[i][j];
+          if (cost > 0) {
+            const midX = (startX + endX) / 2;
+            const midY = (startY + endY) / 2;
+            
+            // Background for cost label
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 1;
+            
+            const textWidth = ctx.measureText(cost.toString()).width;
+            const padding = 4;
+            const rectWidth = textWidth + padding * 2;
+            const rectHeight = 16;
+            
+            ctx.fillRect(midX - rectWidth/2, midY - rectHeight/2, rectWidth, rectHeight);
+            ctx.strokeRect(midX - rectWidth/2, midY - rectHeight/2, rectWidth, rectHeight);
+            
+            // Cost text
+            ctx.fillStyle = '#8B4513';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(cost.toString(), midX, midY);
+          }
         }
       }
     }
 
-    // Draw optimal path if available
-    if (result && result.path.length > 0) {
-      ctx.setLineDash([]);
-      ctx.strokeStyle = '#DC2626';
-      ctx.lineWidth = 3;
-
-      for (let i = 0; i < result.path.length; i++) {
-        const from = result.path[i];
-        const to = result.path[(i + 1) % result.path.length];
-        
-        ctx.beginPath();
-        ctx.moveTo(positions[from].x, positions[from].y);
-        ctx.lineTo(positions[to].x, positions[to].y);
-        ctx.stroke();
-
-        // Draw arrow
-        const angle = Math.atan2(
-          positions[to].y - positions[from].y,
-          positions[to].x - positions[from].x
-        );
-        
-        const arrowLength = 15;
-        const arrowAngle = Math.PI / 6;
-        
-        const endX = positions[to].x - 25 * Math.cos(angle);
-        const endY = positions[to].y - 25 * Math.sin(angle);
-        
-        ctx.beginPath();
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(
-          endX - arrowLength * Math.cos(angle - arrowAngle),
-          endY - arrowLength * Math.sin(angle - arrowAngle)
-        );
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(
-          endX - arrowLength * Math.cos(angle + arrowAngle),
-          endY - arrowLength * Math.sin(angle + arrowAngle)
-        );
-        ctx.stroke();
-      }
-    }
-
-    // Draw cities
+    // Draw cities as white circles with dashed brown border
     cities.forEach((city, index) => {
       const pos = positions[index];
       
-      // City circle
-      ctx.fillStyle = result && result.path.includes(index) ? '#DC2626' : '#2563EB';
+      // City circle (white fill)
+      ctx.fillStyle = 'white';
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 20, 0, 2 * Math.PI);
+      ctx.arc(pos.x, pos.y, 30, 0, 2 * Math.PI);
       ctx.fill();
 
-      // City border
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 3;
+      // City border (dashed brown)
+      ctx.strokeStyle = '#8B4513';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
       ctx.stroke();
 
-      // City number
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 14px Arial';
+      // City label (single letter)
+      ctx.fillStyle = '#8B4513';
+      ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText((index + 1).toString(), pos.x, pos.y);
-
-      // City name
-      ctx.fillStyle = '#374151';
-      ctx.font = '12px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(city.name, pos.x, pos.y + 25);
+      ctx.fillText(city.name.charAt(0).toUpperCase(), pos.x, pos.y);
     });
 
   }, [cities, costMatrix, result]);
+
+  // Check if matrix has any valid connections
+  const hasValidConnections = costMatrix.some((row, i) => 
+    row.some((cost, j) => i !== j && cost > 0)
+  );
 
   if (cities.length === 0) {
     return (
@@ -166,6 +191,20 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         <div className="text-center text-gray-500">
           <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
           <p>La visualisation apparaîtra une fois les villes définies</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasValidConnections) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="text-center text-gray-500">
+          <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+          <p>Définissez des coûts dans la matrice pour voir le graphe</p>
+          <p className="text-sm text-gray-400 mt-2">
+            Le graphe s'affichera automatiquement une fois les coûts saisis
+          </p>
         </div>
       </div>
     );
@@ -179,12 +218,10 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
             <Eye className="h-5 w-5 text-indigo-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Visualisation du graphe</h3>
-            {result && (
-              <p className="text-sm text-green-600 font-medium">
-                Circuit optimal: coût {result.cost}
-              </p>
-            )}
+            <h3 className="text-lg font-semibold text-gray-900">Graphe du problème</h3>
+            <p className="text-sm text-gray-600">
+              Représentation des connexions entre villes avec coûts
+            </p>
           </div>
         </div>
       </div>
@@ -192,7 +229,7 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
       <div className="p-4">
         <canvas
           ref={canvasRef}
-          className="w-full h-80 border border-gray-200 rounded-lg"
+          className="w-full h-96 border border-gray-200 rounded-lg"
         />
       </div>
 
@@ -200,19 +237,17 @@ export const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
+              <div className="w-4 h-4 bg-white border-2 border-brown-600 rounded-full"></div>
               <span className="text-gray-600">Villes</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-4 h-1 bg-gray-300"></div>
-              <span className="text-gray-600">Connexions</span>
+              <div className="w-4 h-1 bg-brown-600 border-dashed border-brown-600"></div>
+              <span className="text-gray-600">Connexions dirigées</span>
             </div>
-            {result && (
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-1 bg-red-600"></div>
-                <span className="text-gray-600">Circuit optimal</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-4 bg-white border border-brown-600 text-xs text-brown-600 flex items-center justify-center">24</div>
+              <span className="text-gray-600">Coûts</span>
+            </div>
           </div>
         </div>
       </div>

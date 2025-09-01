@@ -3,6 +3,7 @@ import { CityManager } from './components/CityManager';
 import { MatrixEditor } from './components/MatrixEditor';
 import { LittleAlgorithm } from './components/LittleAlgorithm';
 import { GraphVisualization } from './components/GraphVisualization';
+import { DecisionTree } from './components/DecisionTree';
 import { ResultDisplay } from './components/ResultDisplay';
 import { MapPin, Settings, Play, RotateCcw } from 'lucide-react';
 
@@ -163,45 +164,40 @@ function App() {
 
         {currentStep === 'algorithm' && (
           <div className="space-y-6">
-            <div className="space-y-6">
-              <LittleAlgorithm
-                cities={cities}
-                costMatrix={costMatrix}
-                onComplete={handleAlgorithmComplete}
-                isRunning={isRunning}
-                setIsRunning={setIsRunning}
-              />
-            </div>
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <GraphVisualization
-                cities={cities}
-                costMatrix={costMatrix}
-                result={result}
-              />
-              {result && (
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Résumé de la solution
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Circuit optimal:</span>
-                      <span className="font-semibold">
-                        {result.path.map(i => cities[i]?.name || `V${i+1}`).join(' → ')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Coût total:</span>
-                      <span className="font-bold text-green-600">{result.cost}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Étapes calculées:</span>
-                      <span className="font-semibold">{result.steps.length}</span>
-                    </div>
+            <LittleAlgorithm
+              cities={cities}
+              costMatrix={costMatrix}
+              onComplete={handleAlgorithmComplete}
+              isRunning={isRunning}
+              setIsRunning={setIsRunning}
+            />
+            
+
+            
+            {/* Results summary */}
+            {result && (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Résumé de la solution
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Circuit optimal:</span>
+                    <span className="font-semibold">
+                      {result.path.map(i => cities[i]?.name || `V${i+1}`).join(' → ')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Coût total:</span>
+                    <span className="font-bold text-green-600">{result.cost}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Étapes calculées:</span>
+                    <span className="font-semibold">{result.steps.length}</span>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -1,12 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { GitBranch } from 'lucide-react';
-import { LittleStep, City } from '../App';
-
-interface DecisionTreeProps {
-  steps: LittleStep[];
-  cities: City[];
-  currentStep: number;
-}
 
 interface TreeNode {
   id: string;
@@ -19,21 +12,37 @@ interface TreeNode {
   parent?: string;
   children: string[];
   isActive: boolean;
-  isOptimal?: boolean;
-  branchValue?: number; // Value on the branch leading to this node
+  branchValue?: number;
 }
 
-export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, currentStep }) => {
+interface TreeVisualizationProps {
+  steps: any[];
+  cities: any[];
+  currentStepIndex: number;
+}
+
+export const TreeVisualization: React.FC<TreeVisualizationProps> = ({ 
+  steps, 
+  cities, 
+  currentStepIndex 
+}) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [nodes, setNodes] = React.useState<Map<string, TreeNode>>(new Map());
+  
+  // Zoom and pan state
+  const [zoom, setZoom] = React.useState(0.5); // Start with smaller zoom
+  const [panX, setPanX] = React.useState(0);
+  const [panY, setPanY] = React.useState(0);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
 
   useEffect(() => {
     buildTree();
-  }, [steps, currentStep]);
+  }, [steps, currentStepIndex]);
 
   useEffect(() => {
     drawTree();
-  }, [nodes]);
+  }, [nodes, zoom, panX, panY]);
 
   // Show message if no cities
   if (cities.length === 0) {
@@ -46,16 +55,15 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
       </div>
     );
   }
-
   const buildTree = () => {
     const nodeMap = new Map<string, TreeNode>();
     
     // Always create at least a root node
     const rootNode: TreeNode = {
-      id: 'root',
+        id: 'root',
       type: 'root',
-      bound: steps.length > 0 ? steps[0]?.bound || 0 : 100, // Default bound if no steps
-      level: 0,
+      bound: steps.length > 0 ? steps[0]?.bound || 0 : 100,
+        level: 0,
       x: 0,
       y: 0,
       children: [],
@@ -63,20 +71,22 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
     };
     nodeMap.set('root', rootNode);
 
-    // If we have steps, build the tree from steps
+    // Build progressively up to currentStepIndex
     if (steps.length > 0) {
       let nodeCounter = 1;
       let currentParent = 'root';
 
-      // Build only from regret steps; fetch the subsequent branch step for bounds
-      steps.forEach((step, i) => {
+      // Only show nodes up to current step (progressive building)
+      const filteredSteps = steps.filter((_, index) => index <= currentStepIndex);
+
+      filteredSteps.forEach((step, i) => {
         if (step.type === 'regret' && step.selectedArc) {
           const [arcI, arcJ] = step.selectedArc;
 
           const parentNode = nodeMap.get(currentParent);
           if (!parentNode) return;
 
-          // Find the following branch step (usually step.step + 1)
+          // Find the following branch step
           const branchStep = steps.find(s => s.type === 'branch' && s.step === step.step + 1);
 
           // Parse bounds from branchStep description if available
@@ -89,7 +99,6 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
             if (inclMatch) parsedIncludeBound = parseFloat(inclMatch[1]);
           }
 
-          // Fallbacks: include bound may be the branch step bound; exclude bound fallback uses regret increment
           const includeBound = parsedIncludeBound ?? branchStep?.bound ?? parentNode.bound;
           const excludeIncrement = step.regrets?.[arcI]?.[arcJ] ?? 0;
           const excludeBound = parsedExcludeBound ?? (parentNode.bound + excludeIncrement);
@@ -106,7 +115,7 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
             y: 0,
             parent: currentParent,
             children: [],
-            isActive: i <= currentStep,
+            isActive: true,
             branchValue: excludeBound - parentNode.bound
           };
           nodeMap.set(excludeId, excludeNode);
@@ -123,7 +132,7 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
             y: 0,
             parent: currentParent,
             children: [],
-            isActive: i <= currentStep,
+            isActive: true,
             branchValue: includeBound - parentNode.bound
           };
           nodeMap.set(includeId, includeNode);
@@ -136,59 +145,11 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
           nodeCounter++;
         }
       });
-    } else {
-      // Create demo tree structure if no steps yet
-      const excludeId = 'exclude_1';
-      const includeId = 'include_1';
-      
-      const excludeNode: TreeNode = {
-        id: excludeId,
-        type: 'exclude',
-        arc: [0, 1],
-        bound: rootNode.bound + 24,
-        level: 1,
-        x: 0,
-        y: 0,
-        parent: 'root',
-        children: [],
-        isActive: true,
-        branchValue: 24
-      };
-      
-      const includeNode: TreeNode = {
-        id: includeId,
-        type: 'include',
-        arc: [0, 1],
-        bound: rootNode.bound,
-        level: 1,
-        x: 0,
-        y: 0,
-        parent: 'root',
-        children: [],
-        isActive: true,
-        branchValue: 0
-      };
-      
-      nodeMap.set(excludeId, excludeNode);
-      nodeMap.set(includeId, includeNode);
-      rootNode.children.push(excludeId, includeId);
     }
 
     // Calculate positions
     calculatePositions(nodeMap);
     setNodes(nodeMap);
-    
-    // Debug log
-    console.log('Tree built:', Array.from(nodeMap.values()).map(n => ({
-      id: n.id,
-      parent: n.parent,
-      children: n.children,
-      level: n.level,
-      type: n.type,
-      bound: n.bound,
-      x: n.x,
-      y: n.y
-    })));
   };
 
   const calculatePositions = (nodeMap: Map<string, TreeNode>) => {
@@ -197,7 +158,7 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const width = rect.width || 800; // Use actual width or fallback to 800
+    const width = rect.width || 800;
 
     // Group nodes by level and find max depth
     const levelNodes = new Map<number, TreeNode[]>();
@@ -220,10 +181,9 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
     if (rootNode) {
       rootNode.x = width / 2;
       rootNode.y = topMargin;
-      console.log('Root positioned at:', rootNode.x, rootNode.y, 'Canvas width:', width);
     }
 
-    // Position nodes level by level in a hierarchical (arborescent) manner
+    // Position nodes level by level in a hierarchical manner
     for (let level = 1; level <= maxLevel; level++) {
       const nodesAtLevel = levelNodes.get(level) || [];
       const y = topMargin + level * verticalSpacing;
@@ -246,15 +206,6 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
         node.y = y;
       });
     }
-
-    // Debug log for positioning
-    console.log('Positions calculated (hierarchical):', Array.from(nodeMap.values()).map(n => ({
-      id: n.id,
-      x: n.x,
-      y: n.y,
-      level: n.level,
-      parent: n.parent
-    })));
   };
 
   const drawTree = () => {
@@ -276,23 +227,12 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
 
-    // Debug: Draw background grid to see canvas bounds
-    ctx.strokeStyle = '#f0f0f0';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < width; i += 50) {
-      ctx.beginPath();
-      ctx.moveTo(i, 0);
-      ctx.lineTo(i, height);
-      ctx.stroke();
-    }
-    for (let i = 0; i < height; i += 50) {
-      ctx.beginPath();
-      ctx.moveTo(0, i);
-      ctx.lineTo(width, i);
-      ctx.stroke();
-    }
+    // Apply zoom and pan transformations
+    ctx.save();
+    ctx.translate(panX, panY);
+    ctx.scale(zoom, zoom);
 
-    // Draw connections with branch values
+    // Draw connections
     nodes.forEach(node => {
       if (node.parent) {
         const parent = nodes.get(node.parent);
@@ -312,31 +252,6 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
           ctx.moveTo(startX, startY);
           ctx.lineTo(endX, endY);
           ctx.stroke();
-
-          // Draw branch value near the child node
-          if (node.branchValue !== undefined && node.branchValue > 0) {
-            // Position the value closer to the child node
-            const midX = startX + (endX - startX) * 0.7;
-            const midY = startY + (endY - startY) * 0.7;
-            
-            // Background for text
-            const text = node.branchValue.toString();
-            const textWidth = ctx.measureText(text).width;
-            ctx.fillStyle = 'white';
-            ctx.fillRect(midX - textWidth/2 - 4, midY - 8, textWidth + 8, 16);
-            
-            // Border for text background
-            ctx.strokeStyle = '#D1D5DB';
-            ctx.lineWidth = 1;
-            ctx.strokeRect(midX - textWidth/2 - 4, midY - 8, textWidth + 8, 16);
-            
-            // Text
-            ctx.fillStyle = node.isActive ? '#374151' : '#9CA3AF';
-            ctx.font = 'bold 12px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, midX, midY);
-          }
         }
       }
     });
@@ -345,10 +260,7 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
     nodes.forEach(node => {
       const radius = 30;
       
-      // Debug: Log node being drawn
-      console.log(`Drawing node: ${node.id} at (${node.x}, ${node.y})`);
-      
-      // Node circle with dashed outline
+      // Node circle
       ctx.fillStyle = getNodeColor(node);
       ctx.beginPath();
       ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
@@ -381,40 +293,115 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
       ctx.font = '12px Arial';
       ctx.fillText(node.bound.toString(), node.x, node.y - radius - 15);
     });
+
+    ctx.restore();
   };
 
   const getNodeColor = (node: TreeNode): string => {
     if (!node.isActive) return '#E5E7EB';
     
     switch (node.type) {
-      case 'root': return '#60A5FA'; // Light blue like in the image
+      case 'root': return '#60A5FA'; // Light blue
       case 'include': return '#3B82F6'; // Blue
       case 'exclude': return '#EF4444'; // Red
       default: return '#6B7280';
     }
   };
 
+  // Event handlers for zoom and pan
+  const handleWheel = (e: React.WheelEvent) => {
+    // Only zoom if the event is on a zoom control button
+    const target = e.target as HTMLElement;
+    if (target.closest('.zoom-control')) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const newZoom = Math.max(0.1, Math.min(2, zoom * delta));
+      setZoom(newZoom);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - panX, y: e.clientY - panY });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging) {
+      setPanX(e.clientX - dragStart.x);
+      setPanY(e.clientY - dragStart.y);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const resetView = () => {
+    setZoom(0.5);
+    setPanX(0);
+    setPanY(0);
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <GitBranch className="h-5 w-5 text-purple-600" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <GitBranch className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Arbre de décision (Progressif)</h3>
+              <p className="text-sm text-gray-600">
+                Construction étape par étape de l'algorithme
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Arbre de décision</h3>
-            <p className="text-sm text-gray-600">
-              Processus étape par étape de l'algorithme
-            </p>
+
+          {/* Zoom controls */}
+          <div className="flex items-center space-x-2 zoom-control">
+            <button
+              onClick={() => setZoom(Math.max(0.1, zoom - 0.1))}
+              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+            >
+              −
+            </button>
+            <span className="text-sm text-gray-600 min-w-[60px] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={() => setZoom(Math.min(2, zoom + 0.1))}
+              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+            >
+              +
+            </button>
+            <button
+              onClick={resetView}
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+            >
+              Reset
+            </button>
           </div>
         </div>
       </div>
-      
+
       <div className="p-4">
-        <canvas
-          ref={canvasRef}
-          className="w-full h-[600px] border border-gray-200 rounded-lg"
-        />
+        <div className="relative">
+          <canvas
+            ref={canvasRef}
+            className="w-full h-[400px] border border-gray-200 rounded-lg cursor-grab active:cursor-grabbing"
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          />
+          
+                    {/* Instructions overlay */}
+          <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+            Drag: déplacer • Boutons: zoom
+                </div>
+        </div>
       </div>
 
       <div className="p-4 bg-gray-50 border-t border-gray-200">
@@ -434,7 +421,7 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
             </div>
           </div>
           <div className="text-gray-600">
-            Étape {currentStep + 1} / {steps.length}
+            Étape {currentStepIndex + 1} / {steps.length}
           </div>
         </div>
       </div>

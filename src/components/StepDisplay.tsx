@@ -38,33 +38,36 @@ export const StepDisplay: React.FC<StepDisplayProps> = ({ step, cities }) => {
           <table className="w-full border-collapse border border-gray-300 text-sm">
             <thead>
               <tr>
-                <th className="border border-gray-300 bg-white p-2 font-semibold">
-                  i\j
-                </th>
-                {cities.map((_, j) => (
-                  <th key={j} className="border border-gray-300 bg-white p-2 font-semibold">
-                    {j + 1}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {matrix.map((row, i) => (
-                <tr key={i}>
-                  <td className="border border-gray-300 bg-white p-2 font-semibold">
-                    {i + 1}
-                  </td>
-                  {row.map((cell, j) => {
+                                 <th className="border border-gray-300 bg-white p-2 font-semibold min-w-[60px]">
+                   De \ Vers
+                 </th>
+                                 {cities.map((city, j) => (
+                   <th key={j} className="border border-gray-300 bg-white p-2 font-semibold min-w-[60px]">
+                     {city.name.charAt(0).toUpperCase()}
+                   </th>
+                 ))}
+               </tr>
+             </thead>
+             <tbody>
+               {matrix.map((row, i) => (
+                 <tr key={i}>
+                   <td className="border border-gray-300 bg-white p-2 font-semibold min-w-[60px]">
+                     {cities[i].name.charAt(0).toUpperCase()}
+                   </td>
+                   {row.map((cell, j) => {
                     const isHighlighted = highlight && highlight[0] === i && highlight[1] === j;
                     const isInfinity = cell === Infinity;
+                    const isDisabled = cell === -999; // Cellules désactivées (ligne/colonne supprimées)
+                    const isDiagonal = i === j;
                     
                     return (
                       <td key={j} className={`
-                        border border-gray-300 p-2 text-center
-                        ${isHighlighted ? 'bg-yellow-200' : 'bg-white'}
-                        ${cell === 0 && !isInfinity ? 'bg-green-100 font-bold' : ''}
+                        border border-gray-300 p-2 text-center min-w-[60px]
+                        ${isHighlighted ? 'bg-yellow-200' : ''}
+                        ${isDiagonal || isDisabled ? 'bg-gray-100 text-gray-500' : 'bg-white'}
+                        ${cell === 0 && !isInfinity && !isDiagonal && !isDisabled ? 'bg-red-100 text-red-700 font-bold' : ''}
                       `}>
-                        {isInfinity ? '∞' : cell.toFixed(cell % 1 === 0 ? 0 : 1)}
+                        {isDiagonal || isDisabled ? '—' : (isInfinity ? '∞' : cell.toFixed(cell % 1 === 0 ? 0 : 1))}
                       </td>
                     );
                   })}
@@ -87,29 +90,29 @@ export const StepDisplay: React.FC<StepDisplayProps> = ({ step, cities }) => {
           <table className="w-full border-collapse border border-gray-300 text-sm">
             <thead>
               <tr>
-                <th className="border border-gray-300 bg-white p-2 font-semibold">
-                  i\j
-                </th>
-                {cities.map((_, j) => (
-                  <th key={j} className="border border-gray-300 bg-white p-2 font-semibold">
-                    {j + 1}
-                  </th>
-                ))}
+                                 <th className="border border-gray-300 bg-white p-2 font-semibold min-w-[60px]">
+                   De \ Vers
+                 </th>
+                                 {cities.map((city, j) => (
+                   <th key={j} className="border border-gray-300 bg-white p-2 font-semibold min-w-[60px]">
+                     {city.name.charAt(0).toUpperCase()}
+                   </th>
+                 ))}
               </tr>
             </thead>
             <tbody>
-              {regrets.map((row, i) => (
-                <tr key={i}>
-                  <td className="border border-gray-300 bg-white p-2 font-semibold">
-                    {i + 1}
-                  </td>
+                             {regrets.map((row, i) => (
+                 <tr key={i}>
+                   <td className="border border-gray-300 bg-white p-2 font-semibold min-w-[60px]">
+                     {cities[i].name.charAt(0).toUpperCase()}
+                   </td>
                   {row.map((cell, j) => (
-                    <td key={j} className={`
-                      border border-gray-300 p-2 text-center
-                      ${cell > 0 ? 'bg-blue-100 font-semibold' : 'bg-white'}
-                    `}>
-                      {cell > 0 ? cell.toFixed(1) : '—'}
-                    </td>
+                                       <td key={j} className={`
+                     border border-gray-300 p-2 text-center min-w-[60px]
+                     ${cell > 0 ? 'bg-blue-100 font-semibold' : 'bg-white'}
+                   `}>
+                     {cell > 0 ? Math.round(cell) : '—'}
+                   </td>
                   ))}
                 </tr>
               ))}

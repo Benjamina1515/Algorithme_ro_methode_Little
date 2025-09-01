@@ -16,17 +16,29 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
   const [matrix, setMatrix] = useState<number[][]>(initialMatrix);
 
   useEffect(() => {
+    console.log('MatrixEditor - Cities received:', cities);
+    console.log('MatrixEditor - Initial matrix:', initialMatrix);
+    console.log('MatrixEditor - Cities length:', cities.length);
+    console.log('MatrixEditor - Matrix length:', initialMatrix.length);
+    
     if (initialMatrix.length !== cities.length) {
       const n = cities.length;
+      console.log('MatrixEditor - Creating new matrix with size:', n);
       const newMatrix = Array(n).fill(null).map((_, i) => 
-        Array(n).fill(null).map((_, j) => i === j ? 0 : 0)
+        Array(n).fill(null).map((_, j) => {
+          if (i === j) return 0;
+          // Initialize with empty values instead of random costs
+          return 0; // Let user fill manually
+        })
       );
+      console.log('MatrixEditor - New matrix created:', newMatrix);
       setMatrix(newMatrix);
     }
   }, [cities, initialMatrix]);
 
   const updateMatrix = (i: number, j: number, value: string) => {
-    const numValue = parseFloat(value) || 0;
+    // Si la valeur est vide, on met 0 pour la validation, mais on affiche rien
+    const numValue = value === '' ? 0 : parseInt(value) || 0;
     const newMatrix = matrix.map(row => [...row]);
     newMatrix[i][j] = numValue;
     setMatrix(newMatrix);
@@ -37,7 +49,10 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
     const newMatrix = Array(n).fill(null).map((_, i) => 
       Array(n).fill(null).map((_, j) => {
         if (i === j) return 0;
-        return Math.floor(Math.random() * 90) + 10; // Random between 10-99
+        // Generate realistic costs for demonstration
+        const baseCost = Math.floor(Math.random() * 40) + 20; // 20-59
+        const variation = Math.floor(Math.random() * 20) - 10; // -10 to +10
+        return Math.max(15, baseCost + variation); // Ensure minimum cost of 15
       })
     );
     setMatrix(newMatrix);
@@ -95,6 +110,9 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
           <p className="text-gray-600 mt-1">
             Définissez les coûts de déplacement entre chaque paire de villes
           </p>
+          <p className="text-blue-600 text-sm mt-2">
+            💡 Le graphe se mettra à jour automatiquement selon vos valeurs !
+          </p>
         </div>
         
         <div className="flex items-center space-x-3">
@@ -137,12 +155,11 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
               {cities.map((city, index) => (
                 <th key={city.id} className="border border-gray-300 bg-gray-50 p-3 text-center 
                                              font-semibold min-w-[100px]">
-                  <div className="flex items-center justify-center space-x-1">
-                    <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center 
-                                   justify-center text-xs font-bold">
-                      {index + 1}
+                  <div className="flex items-center justify-center">
+                    <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center 
+                                   justify-center text-sm font-bold">
+                      {city.name.charAt(0).toUpperCase()}
                     </span>
-                    <span className="text-xs">{city.name}</span>
                   </div>
                 </th>
               ))}
@@ -152,12 +169,11 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
             {cities.map((fromCity, i) => (
               <tr key={fromCity.id}>
                 <td className="border border-gray-300 bg-gray-50 p-3 font-semibold">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center 
-                                   justify-center text-xs font-bold">
-                      {i + 1}
+                  <div className="flex items-center justify-center">
+                    <span className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center 
+                                   justify-center text-sm font-bold">
+                      {fromCity.name.charAt(0).toUpperCase()}
                     </span>
-                    <span className="text-sm">{fromCity.name}</span>
                   </div>
                 </td>
                 {cities.map((toCity, j) => (
@@ -165,15 +181,16 @@ export const MatrixEditor: React.FC<MatrixEditorProps> = ({
                     {i === j ? (
                       <div className="text-center text-gray-400 font-bold">—</div>
                     ) : (
-                      <input
-                        type="number"
-                        value={matrix[i]?.[j] || 0}
-                        onChange={(e) => updateMatrix(i, j, e.target.value)}
-                        className="w-full px-2 py-2 text-center border-0 focus:ring-2 focus:ring-blue-500 
-                                 rounded transition-all duration-200"
-                        min="0"
-                        step="0.1"
-                      />
+                                             <input
+                         type="number"
+                         value={matrix[i]?.[j] === 0 ? '' : matrix[i]?.[j] || ''}
+                         onChange={(e) => updateMatrix(i, j, e.target.value)}
+                         className="w-full px-2 py-2 text-center border-0 focus:ring-2 focus:ring-blue-500 
+                                  rounded transition-all duration-200"
+                         min="0"
+                                                    step="1"
+                         placeholder=""
+                       />
                     )}
                   </td>
                 ))}

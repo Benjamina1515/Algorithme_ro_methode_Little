@@ -1,6 +1,8 @@
 import React from 'react';
 import { CheckCircle, Download, BarChart3, Route } from 'lucide-react';
 import { City, TSPResult } from '../App';
+import { DecisionTree } from './DecisionTree';
+import { GraphVisualization } from './GraphVisualization';
 
 interface ResultDisplayProps {
   cities: City[];
@@ -23,8 +25,8 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
       timestamp: new Date().toISOString()
     };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { 
-      type: 'application/json' 
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json'
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -38,7 +40,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
       const nextIndex = (index + 1) % result.path.length;
       const nextCityIndex = result.path[nextIndex];
       const cost = costMatrix[cityIndex][nextCityIndex];
-      
+
       return {
         from: cities[cityIndex].name,
         to: cities[nextCityIndex].name,
@@ -64,7 +66,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
             </p>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
             <div className="flex items-center space-x-3">
@@ -75,7 +77,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
             <div className="flex items-center space-x-3">
               <BarChart3 className="h-6 w-6" />
@@ -85,7 +87,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
               </div>
             </div>
           </div>
-          
+
           <div className="bg-white bg-opacity-10 rounded-lg p-4">
             <div className="flex items-center space-x-3">
               <CheckCircle className="h-6 w-6" />
@@ -99,110 +101,22 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Optimal Path */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Circuit optimal</h3>
-            <button
-              onClick={exportResults}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg 
-                       transition-colors duration-200 flex items-center space-x-2"
-            >
-              <Download className="h-4 w-4" />
-              <span>Exporter</span>
-            </button>
-          </div>
+        {/* Decision Tree */}
+        <DecisionTree
+          steps={result.steps}
+          cities={cities}
+          currentStep={result.steps.length - 1}
+        />
 
-          <div className="space-y-4">
-            {pathSegments.map((segment, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                    {index + 1}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">
-                      {segment.from} → {segment.to}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Étape {index + 1} du circuit
-                    </div>
-                  </div>
-                </div>
-                <div className="text-lg font-bold text-blue-600">
-                  {segment.cost}
-                </div>
-              </div>
-            ))}
-            
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center text-lg font-bold">
-                <span>Coût total du circuit:</span>
-                <span className="text-green-600">{result.cost}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Algorithm Statistics */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Statistiques de l'algorithme</h3>
-          
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Étapes de résolution</h4>
-              <div className="space-y-2">
-                {['reduction', 'regret', 'branch', 'final'].map((type) => {
-                  const count = result.steps.filter(step => step.type === type).length;
-                  const labels = {
-                    reduction: 'Réductions de matrice',
-                    regret: 'Calculs de regrets',
-                    branch: 'Évaluations de branches',
-                    final: 'Solution finale'
-                  };
-                  
-                  return (
-                    <div key={type} className="flex justify-between items-center">
-                      <span className="text-gray-600">{labels[type as keyof typeof labels]}</span>
-                      <span className="font-semibold">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Efficacité</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Nombre de villes</span>
-                  <span className="font-semibold">{cities.length}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Solutions possibles</span>
-                  <span className="font-semibold">
-                    {(function factorial(n: number): number {
-                      return n <= 1 ? 1 : n * factorial(n - 1);
-                    })(cities.length - 1) / 2}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Étapes calculées</span>
-                  <span className="font-semibold text-green-600">{result.steps.length}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="text-sm text-green-800">
-                <strong>Optimisation réussie !</strong><br />
-                L'algorithme LITTLE a trouvé la solution optimale en explorant seulement une fraction 
-                des solutions possibles grâce à la méthode de séparation et évaluation.
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Graph of Optimal Circuit */}
+        <GraphVisualization
+          cities={cities}
+          costMatrix={costMatrix}
+          result={result}
+        />
       </div>
+
+
     </div>
   );
 };
