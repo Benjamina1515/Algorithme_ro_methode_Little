@@ -15,9 +15,11 @@ interface LittleAlgorithmProps {
 interface BranchNode {
   matrix: number[][];
   bound: number;
-  includedArcs: Array<[number, number]>; // Changé de path à includedArcs
+  includedArcs: Array<[number, number]>;
   excluded: Array<[number, number]>;
   level: number;
+  type: 'root' | 'exclusion' | 'inclusion';
+  parentBound: number;
 }
 
 // Union-Find pour tracker les composants connectés
@@ -321,13 +323,15 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
       description: `Réduction par ligne puis par colonne. Borne inférieure initiale: ${initialBound}`
     });
 
-    // Initialize the branch and bound
+    // Initialiser l'arborescence avec la racine
     const queue: BranchNode[] = [{
       matrix: reducedMatrix,
       bound: initialBound,
-      includedArcs: [], // Changé de path à includedArcs
+      includedArcs: [],
       excluded: [],
-      level: 0
+      level: 0,
+      type: 'root',
+      parentBound: 0
     }];
 
     let bestCost = 1e9;
@@ -361,7 +365,33 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
       const regrets = calculateRegrets(currentNode.matrix);
       const [maxI, maxJ, maxRegret] = findMaxRegret(currentNode.matrix, regrets);
 
-      if (maxI === -1) continue; // No zeros found
+      if (maxI === -1) {
+        // Aucun zéro trouvé - vérifier si la matrice est entièrement désactivée
+        let allDisabled = true;
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            if (currentNode.matrix[i][j] !== -999 && currentNode.matrix[i][j] !== 1e9) {
+              allDisabled = false;
+              break;
+            }
+          }
+          if (!allDisabled) break;
+        }
+        
+        if (allDisabled) {
+          console.log(`🛑 MATRICE ENTIÈREMENT DÉSACTIVÉE - Arrêt de l'algorithme`);
+          allSteps.push({
+            step: stepCounter++,
+            type: 'final',
+            title: 'Matrice entièrement désactivée',
+            matrix: deepCopy(currentNode.matrix),
+            bound: currentNode.bound,
+            description: `Tous les arcs sont désactivés (-999) ou bloqués (∞). L'algorithme s'arrête car aucune solution n'est possible.`
+          });
+          break; // Sortir de la boucle principale
+        }
+        continue; // Passer au nœud suivant
+      }
 
       allSteps.push({
         step: stepCounter++,
@@ -379,32 +409,25 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
       excludeMatrix[maxI][maxJ] = -999;
       
       const { matrix: reducedExcludeMatrix, reduction: excludeReduction } = reduceMatrix(excludeMatrix);
-      const excludeBound = currentNode.bound + excludeReduction;
+      const excludeBound = currentNode.bound + maxRegret; // b1 = b + ρ(x, y)
 
-      if (excludeBound < bestCost) {
-        queue.push({
-          matrix: reducedExcludeMatrix,
-          bound: excludeBound,
-          includedArcs: [...currentNode.includedArcs],
-          excluded: [...currentNode.excluded, [maxI, maxJ]],
-          level: currentNode.level
-        });
-      }
-
-      // TYPE 1: Include the arc (i, j)
-      const arcCost = currentNode.matrix[maxI][maxJ];
+      // TYPE 2: Inclusion (x, y)
+      // Supprimez la ligne x et la colonne y de la matrice réduite (car la ville x est visitée vers y).
+      // Bloquez l'arc provoquant un circuit parasite (typiquement l'arc retour y → x pour éviter un cycle de longueur 2).
+      // Vérifiez si la nouvelle matrice a au moins un zéro par ligne et par colonne. Sinon, réduisez-la.
+      // Borne b2 = b + somme des valeurs soustraites lors de cette réduction supplémentaire.
       const includeMatrix = deepCopy(currentNode.matrix);
       
-      // Étape 1: Supprimer la ligne x et la colonne y
+      // Supprimer la ligne x et la colonne y
       for (let k = 0; k < n; k++) {
         includeMatrix[maxI][k] = -999;
         includeMatrix[k][maxJ] = -999;
       }
       
-      // Étape 2: Bloquer l'arc inverse
+      // Bloquer l'arc provoquant un circuit parasite (y → x)
       includeMatrix[maxJ][maxI] = -999;
       
-      // Étape 3: Vérifier les cycles et subtours
+      // Vérifier si la nouvelle matrice a au moins un zéro par ligne et par colonne
       const newIncludedArcs = [...currentNode.includedArcs, [maxI, maxJ]];
       
       // Vérifier si l'ajout de cet arc créerait un cycle prématuré
@@ -414,10 +437,10 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
           type: 'branch',
           title: `Cycle détecté - Branche élaguée`,
           matrix: deepCopy(includeMatrix),
-          bound: currentNode.bound + arcCost,
+          bound: currentNode.bound,
           description: `L'arc (${maxI+1},${maxJ+1}) créerait un cycle prématuré. Branche élaguée.`
         });
-        continue; // Ne pas ajouter cette branche à la queue
+        continue;
       }
       
       // Bloquer les subtours
@@ -428,35 +451,58 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
           continue;
         }
       }
-      
       const { matrix: matrixWithoutSubtours, blockedArcs, description: subtourDescription } = blockSubtours(includeMatrix, newIncludedArcs, uf);
       
+      // Réduire la matrice si nécessaire
       const { matrix: reducedIncludeMatrix, reduction: includeReduction } = reduceMatrix(matrixWithoutSubtours);
-      const includeBound = currentNode.bound + arcCost + includeReduction;
+      const includeBound = currentNode.bound + includeReduction; // b2 = b + somme des valeurs soustraites
 
       // Créer une description des arcs bloqués
       let subtourInfo = '';
-      if (blockedArcs.length > 0) {
+      if (blockedArcs && blockedArcs.length > 0) {
         subtourInfo = `\n  → Subtours bloqués:\n${subtourDescription}`;
       }
 
       allSteps.push({
         step: stepCounter++,
         type: 'branch',
-        title: `Évaluation des branches`,
+        title: `BLOC 3: Évaluation des Sommets de l'Arborescence`,
         matrix: deepCopy(reducedIncludeMatrix),
         bound: includeBound,
-        description: `TYPE 2 (exclure arc): ${excludeBound.toFixed(1)} = ${currentNode.bound} + ${excludeReduction} (réductions) [arc désactivé]\nTYPE 1 (inclure arc): ${includeBound.toFixed(1)} = ${currentNode.bound} + ${arcCost} (coût arc) + ${includeReduction} (réductions)\n  → Ligne ${maxI+1} et colonne ${maxJ+1} supprimées\n  → Arc inverse (${maxJ+1},${maxI+1}) bloqué pour éviter sous-cycle${subtourInfo}`
+        description: `TYPE 1 (exclure arc): b1 = ${excludeBound.toFixed(1)} = ${currentNode.bound} + ${maxRegret} (regret ρ(${maxI+1},${maxJ+1}))\nTYPE 2 (inclure arc): b2 = ${includeBound.toFixed(1)} = ${currentNode.bound} + ${includeReduction} (réductions)\n  → Ligne ${maxI+1} et colonne ${maxJ+1} supprimées\n  → Arc inverse (${maxJ+1},${maxI+1}) bloqué pour éviter sous-cycle${subtourInfo}`
       });
 
-      if (includeBound < bestCost) {
-        queue.push({
-          matrix: reducedIncludeMatrix,
-          bound: includeBound,
-          includedArcs: newIncludedArcs,
-          excluded: [...currentNode.excluded],
-          level: currentNode.level + 1
-        });
+      // DÉCISION: Choisir entre exclusion et inclusion basé sur les bornes
+      if (excludeBound < includeBound) {
+        // L'exclusion est meilleure, on garde la matrice d'exclusion
+        console.log(`🔴 EXCLUSION CHOISIE: ${excludeBound} < ${includeBound}`);
+        
+        if (excludeBound < bestCost) {
+          queue.push({
+            matrix: reducedExcludeMatrix,
+            bound: excludeBound,
+            includedArcs: [...currentNode.includedArcs],
+            excluded: [...currentNode.excluded, [maxI, maxJ]],
+            level: currentNode.level,
+            type: 'exclusion',
+            parentBound: currentNode.bound
+          });
+        }
+      } else {
+        // L'inclusion est meilleure, on garde la matrice d'inclusion
+        console.log(`🟢 INCLUSION CHOISIE: ${includeBound} <= ${excludeBound}`);
+        
+        if (includeBound < bestCost) {
+          queue.push({
+            matrix: reducedIncludeMatrix,
+            bound: includeBound,
+            includedArcs: newIncludedArcs,
+            excluded: [...currentNode.excluded],
+            level: currentNode.level + 1,
+            type: 'inclusion',
+            parentBound: currentNode.bound
+          });
+        }
       }
     }
 
