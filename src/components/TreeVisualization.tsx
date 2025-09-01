@@ -36,6 +36,11 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
 
+  // Vérifier si c'est l'étape finale
+  const isFinalStep = currentStepIndex >= 0 && currentStepIndex < steps.length && 
+                     steps[currentStepIndex]?.type === 'final' && 
+                     steps[currentStepIndex]?.title === 'Solution optimale trouvée';
+
   useEffect(() => {
     buildTree();
   }, [steps, currentStepIndex]);
@@ -310,6 +315,13 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
 
   // Event handlers for zoom and pan
   const handleWheel = (e: React.WheelEvent) => {
+    // Désactiver complètement le zoom dans l'étape finale
+    if (isFinalStep) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    
     // Only zoom if the event is on a zoom control button
     const target = e.target as HTMLElement;
     if (target.closest('.zoom-control')) {
@@ -353,7 +365,10 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Arbre de décision (Progressif)</h3>
               <p className="text-sm text-gray-600">
-                Construction étape par étape de l'algorithme
+                {isFinalStep 
+                  ? 'Étape finale - Zoom désactivé, déplacement autorisé' 
+                  : 'Construction étape par étape de l\'algorithme'
+                }
               </p>
             </div>
           </div>
@@ -362,7 +377,12 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
           <div className="flex items-center space-x-2 zoom-control">
             <button
               onClick={() => setZoom(Math.max(0.1, zoom - 0.1))}
-              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+              disabled={isFinalStep}
+              className={`px-2 py-1 rounded text-sm ${
+                isFinalStep 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-gray-200 hover:bg-gray-300'
+              }`}
             >
               −
             </button>
@@ -371,13 +391,23 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
             </span>
             <button
               onClick={() => setZoom(Math.min(2, zoom + 0.1))}
-              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+              disabled={isFinalStep}
+              className={`px-2 py-1 rounded text-sm ${
+                isFinalStep 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-gray-200 hover:bg-gray-300'
+              }`}
             >
               +
             </button>
             <button
               onClick={resetView}
-              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm"
+              disabled={isFinalStep}
+              className={`px-3 py-1 rounded text-sm ${
+                isFinalStep 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-gray-200'
+              } ${!isFinalStep ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'text-gray-400'}`}
             >
               Reset
             </button>
@@ -386,7 +416,10 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
       </div>
 
       <div className="p-4">
-        <div className="relative">
+        <div 
+          className="relative"
+          onWheel={isFinalStep ? (e) => e.preventDefault() : undefined}
+        >
           <canvas
             ref={canvasRef}
             className="w-full h-[400px] border border-gray-200 rounded-lg cursor-grab active:cursor-grabbing"
@@ -395,12 +428,16 @@ export const TreeVisualization: React.FC<TreeVisualizationProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            style={{ 
+              // Bloquer complètement le zoom par molette dans l'étape finale
+              touchAction: isFinalStep ? 'pan-x pan-y' : 'auto'
+            }}
           />
           
                     {/* Instructions overlay */}
           <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-            Drag: déplacer • Boutons: zoom
-                </div>
+            {isFinalStep ? 'Drag: déplacer • Zoom désactivé' : 'Drag: déplacer • Boutons: zoom'}
+          </div>
         </div>
       </div>
 

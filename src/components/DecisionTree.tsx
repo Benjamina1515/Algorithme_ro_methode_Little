@@ -26,6 +26,9 @@ interface TreeNode {
 export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, currentStep }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [nodes, setNodes] = React.useState<Map<string, TreeNode>>(new Map());
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
+  const [viewOffset, setViewOffset] = React.useState({ x: 0, y: 0 });
 
   useEffect(() => {
     buildTree();
@@ -33,7 +36,54 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
 
   useEffect(() => {
     drawTree();
-  }, [nodes]);
+  }, [nodes, viewOffset]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setIsDragging(true);
+    setDragOffset({ x: x - viewOffset.x, y: y - viewOffset.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging) return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setViewOffset({
+      x: x - dragOffset.x,
+      y: y - dragOffset.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const zoomFactor = 0.1;
+    const delta = e.deltaY > 0 ? 1 - zoomFactor : 1 + zoomFactor;
+    
+    setViewOffset(prev => ({
+      x: prev.x * delta,
+      y: prev.y * delta
+    }));
+  };
 
   // Show message if no cities
   if (cities.length === 0) {
@@ -198,6 +248,7 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
 
     const rect = canvas.getBoundingClientRect();
     const width = rect.width || 800; // Use actual width or fallback to 800
+    const height = rect.height || 600; // Use actual height or fallback to 600
 
     // Group nodes by level and find max depth
     const levelNodes = new Map<number, TreeNode[]>();
@@ -275,6 +326,10 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
 
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
+
+    // Apply view transformation
+    ctx.save();
+    ctx.translate(viewOffset.x, viewOffset.y);
 
     // Debug: Draw background grid to see canvas bounds
     ctx.strokeStyle = '#f0f0f0';
@@ -381,6 +436,9 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
       ctx.font = '12px Arial';
       ctx.fillText(node.bound.toString(), node.x, node.y - radius - 15);
     });
+
+    // Restore context
+    ctx.restore();
   };
 
   const getNodeColor = (node: TreeNode): string => {
@@ -397,16 +455,25 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <GitBranch className="h-5 w-5 text-purple-600" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <GitBranch className="h-5 w-5 text-purple-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Arbre de décision</h3>
+              <p className="text-sm text-gray-600">
+                Processus étape par étape de l'algorithme
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Arbre de décision</h3>
-            <p className="text-sm text-gray-600">
-              Processus étape par étape de l'algorithme
-            </p>
-          </div>
+          <button
+            onClick={() => setViewOffset({ x: 0, y: 0 })}
+            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200"
+            title="Remettre à la position initiale"
+          >
+            Reset
+          </button>
         </div>
       </div>
       
@@ -414,6 +481,12 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
         <canvas
           ref={canvasRef}
           className="w-full h-[600px] border border-gray-200 rounded-lg"
+          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onWheel={handleWheel}
         />
       </div>
 
@@ -436,6 +509,9 @@ export const DecisionTree: React.FC<DecisionTreeProps> = ({ steps, cities, curre
           <div className="text-gray-600">
             Étape {currentStep + 1} / {steps.length}
           </div>
+        </div>
+        <div className="mt-2 text-xs text-gray-500 text-center">
+          💡 Cliquez et glissez pour déplacer l'arbre • Molette pour zoomer • Bouton Reset pour repositionner
         </div>
       </div>
     </div>

@@ -8,6 +8,9 @@ interface StepDisplayProps {
 }
 
 export const StepDisplay: React.FC<StepDisplayProps> = ({ step, cities }) => {
+  // Masquer la borne et le circuit dans l'étape finale "Solution optimale trouvée"
+  const isFinalSolutionStep = step.type === 'final' && step.title === 'Solution optimale trouvée';
+
   const getStepIcon = () => {
     switch (step.type) {
       case 'reduction': return <Calculator className="h-5 w-5" />;
@@ -134,12 +137,14 @@ export const StepDisplay: React.FC<StepDisplayProps> = ({ step, cities }) => {
             {getStepIcon()}
           </div>
           <div>
-            <div className="flex items-center space-x-3">
-              <h3 className="text-xl font-bold">Étape {step.step}</h3>
-              <span className={`px-3 py-1 bg-${color}-700 rounded-full text-sm font-medium`}>
-                Borne: {step.bound.toFixed(1)}
-              </span>
-            </div>
+                           <div className="flex items-center space-x-3">
+                 <h3 className="text-xl font-bold">Étape {step.step}</h3>
+                 {!isFinalSolutionStep && (
+                   <span className={`px-3 py-1 bg-${color}-700 rounded-full text-sm font-medium`}>
+                     Borne: {step.bound.toFixed(1)}
+                   </span>
+                 )}
+               </div>
             <p className="text-lg font-medium mt-1">{step.title}</p>
           </div>
         </div>
@@ -147,10 +152,17 @@ export const StepDisplay: React.FC<StepDisplayProps> = ({ step, cities }) => {
 
       {/* Content */}
       <div className="p-6">
-        {/* Description */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-gray-800 whitespace-pre-line">{step.description}</p>
-        </div>
+                 {/* Description */}
+         <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+           <p className="text-gray-800 whitespace-pre-line">
+             {isFinalSolutionStep
+               ? step.description.replace(/Circuit optimal:.*/g, 'Solution optimale trouvée')
+               : step.description
+             }
+           </p>
+         </div>
+
+
 
         {/* Matrices */}
         <div className="space-y-6">
@@ -163,18 +175,7 @@ export const StepDisplay: React.FC<StepDisplayProps> = ({ step, cities }) => {
           {step.regrets && renderRegrets(step.regrets)}
         </div>
 
-        {/* Additional info for specific step types */}
-        {step.type === 'final' && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center space-x-3 mb-4">
-              <CheckCircle className="h-6 w-6 text-green-600" />
-              <div>
-                <h4 className="text-lg font-bold text-green-900">Solution optimale</h4>
-                <p className="text-sm text-green-700">L'algorithme LITTLE a trouvé le meilleur circuit</p>
-              </div>
-            </div>
-          </div>
-        )}
+        
       </div>
     </div>
   );

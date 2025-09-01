@@ -122,18 +122,45 @@ function App() {
         <div className="flex items-center space-x-4">
           {['cities', 'matrix', 'algorithm', 'result'].map((step, index) => (
             <div key={step} className="flex items-center">
-              <div className={`
-                w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                transition-all duration-300 ${
-                  currentStep === step 
-                    ? 'bg-blue-600 text-white' 
-                    : index < ['cities', 'matrix', 'algorithm', 'result'].indexOf(currentStep)
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-200 text-gray-600'
+              <button
+                onClick={() => {
+                  // Navigation conditionnelle basée sur l'étape actuelle
+                  if (step === 'cities') {
+                    setCurrentStep('cities');
+                  } else if (step === 'matrix' && cities.length >= 3) {
+                    setCurrentStep('matrix');
+                  } else if (step === 'algorithm' && cities.length >= 3 && costMatrix.length > 0) {
+                    setCurrentStep('algorithm');
+                  } else if (step === 'result' && result) {
+                    setCurrentStep('result');
+                  }
+                }}
+                disabled={
+                  (step === 'matrix' && cities.length < 3) ||
+                  (step === 'algorithm' && (cities.length < 3 || costMatrix.length === 0)) ||
+                  (step === 'result' && !result)
                 }
-              `}>
+                className={`
+                  w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
+                  transition-all duration-300 cursor-pointer hover:scale-110
+                  disabled:cursor-not-allowed disabled:hover:scale-100
+                  ${
+                    currentStep === step 
+                      ? 'bg-blue-600 text-white' 
+                      : index < ['cities', 'matrix', 'algorithm', 'result'].indexOf(currentStep)
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                  }
+                `}
+                title={
+                  step === 'cities' ? 'Étape 1: Définition des villes' :
+                  step === 'matrix' ? 'Étape 2: Matrice des coûts' :
+                  step === 'algorithm' ? 'Étape 3: Algorithme LITTLE' :
+                  'Résultat final'
+                }
+              >
                 {index + 1}
-              </div>
+              </button>
               {index < 3 && (
                 <div className={`
                   w-12 h-1 mx-2 rounded transition-all duration-300 ${
@@ -146,6 +173,7 @@ function App() {
             </div>
           ))}
         </div>
+        
       </div>
 
       {/* Main Content */}
@@ -174,30 +202,7 @@ function App() {
             
 
             
-            {/* Results summary */}
-            {result && (
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Résumé de la solution
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Circuit optimal:</span>
-                    <span className="font-semibold">
-                      {result.path.map(i => cities[i]?.name || `V${i+1}`).join(' → ')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Coût total:</span>
-                    <span className="font-bold text-green-600">{result.cost}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Étapes calculées:</span>
-                    <span className="font-semibold">{result.steps.length}</span>
-                  </div>
-                </div>
-              </div>
-            )}
+
           </div>
         )}
 

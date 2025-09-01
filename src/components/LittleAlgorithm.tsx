@@ -390,6 +390,42 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
           });
           break; // Sortir de la boucle principale
         }
+        
+        // ⚠️ AUCUN ZÉRO TROUVÉ - Traitement comme exclusion avec borne infinie
+        console.log(`⚠️ AUCUN ZÉRO TROUVÉ - Traitement comme exclusion avec borne infinie`);
+        
+        // Mettre toutes les valeurs de la matrice à infini (1e9)
+        const infiniteMatrix = deepCopy(currentNode.matrix);
+        for (let i = 0; i < n; i++) {
+          for (let j = 0; j < n; j++) {
+            if (infiniteMatrix[i][j] !== -999) {
+              infiniteMatrix[i][j] = 1e9;
+            }
+          }
+        }
+        
+        allSteps.push({
+          step: stepCounter++,
+          type: 'final',
+          title: 'Aucun regret trouvé - Matrice mise à infini',
+          matrix: infiniteMatrix,
+          bound: 1e9, // Borne infinie
+          description: `Aucun zéro trouvé dans la matrice. Toutes les valeurs sont mises à infini (∞). Borne: ∞`
+        });
+        
+        // Ajouter un nœud d'exclusion avec borne infinie
+        if (1e9 < bestCost) {
+          queue.push({
+            matrix: infiniteMatrix,
+            bound: 1e9,
+            includedArcs: [...currentNode.includedArcs],
+            excluded: [...currentNode.excluded],
+            level: currentNode.level,
+            type: 'exclusion',
+            parentBound: currentNode.bound
+          });
+        }
+        
         continue; // Passer au nœud suivant
       }
 
@@ -536,7 +572,7 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
       title: 'Solution optimale trouvée',
       matrix: finalMatrix,
       bound: bestCost,
-      description: `Circuit optimal: ${bestPath.map(i => cities[i]?.name || `Ville ${i+1}`).join(' → ')} → ${cities[bestPath[0]]?.name || `Ville ${bestPath[0]+1}`}\nCoût total: ${bestCost}`
+      description: `Circuit optimal: ${bestPath.map(i => cities[i]?.name || `Ville ${i+1}`).join(' → ')} → ${cities[bestPath[0]]?.name || `Ville ${bestPath[0]+1}`}`
     });
 
     return {
@@ -615,6 +651,21 @@ export const LittleAlgorithm: React.FC<LittleAlgorithmProps> = ({
     setCurrentStepIndex(-1);
     setIsRunning(false);
     setIsAutoPlaying(false);
+  };
+
+  // Fonction utilitaire pour afficher les valeurs de la matrice
+  const formatMatrixValue = (value: number): string => {
+    if (value === 1e9) return '∞';
+    if (value === -999) return '×';
+    return value.toString();
+  };
+
+  // Fonction utilitaire pour obtenir la classe CSS selon la valeur
+  const getMatrixCellClass = (value: number): string => {
+    if (value === 1e9) return 'bg-red-100 text-red-800 font-bold';
+    if (value === -999) return 'bg-gray-100 text-gray-600 font-bold';
+    if (value === 0) return 'bg-green-100 text-green-800 font-bold';
+    return 'bg-blue-50';
   };
 
   return (

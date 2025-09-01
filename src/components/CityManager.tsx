@@ -7,12 +7,7 @@ interface CityManagerProps {
 }
 
 export const CityManager: React.FC<CityManagerProps> = ({ onCitiesConfirmed }) => {
-  const [cities, setCities] = useState<City[]>([
-    { id: '1', name: 'Paris' },
-    { id: '2', name: 'Lyon' },
-    { id: '3', name: 'Marseille' },
-    { id: '4', name: 'Toulouse' }
-  ]);
+  const [cities, setCities] = useState<City[]>([]);
   const [newCityName, setNewCityName] = useState('');
 
   const addCity = () => {
